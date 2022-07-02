@@ -1,9 +1,10 @@
 # files
 .vscode
 .env
-.env.local
 package-lock.json
 yarn.lock
+Lavalink/application.yml
+Lavalink/Lavalink.jar
 
 # folders
 build
