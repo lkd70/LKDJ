@@ -1,9 +1,6 @@
-import {
-    AutocompleteInteraction,
-    CommandInteraction,
-    MessageEmbed,
-} from "discord.js";
+import { AutocompleteInteraction, Client, CommandInteraction, Guild, MessageEmbed } from "discord.js";
 import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
+import db from '../db/db.js';
 
 const hlna = {
     emotes: [
@@ -511,16 +508,69 @@ const forcefeild_cost = (sec: number, r: number) => Math.abs(sec / 3600) * r;
 
 @Discord()
 export class Forges {
+    
+    getUsername = (user: string, guild: (Guild | null)) => guild?.members.cache.get(user);
+    
     @Slash()
-    forges(interaction: CommandInteraction): void {
-        interaction.reply({ content: "Thanks!", ephemeral: true });
-        const now = new Date();
-        const diff = 18480000; // 4 hours 8 minutes
-        const time = ((now.getTime() + diff - 3600000) / 1000).toFixed(0);
-        interaction.channel?.send(`<@${interaction.member?.user.id}> has filled the forges!. I'll notify at <t:${time}:t> in <t:${time}:R> when it's time to go again.`);
-        setTimeout(() => {
-            interaction.channel?.send('@everyone It\'s roughly time to cycle the forges!');
-        }, diff);
+    forges(
+        @SlashOption("stats", { 
+            description: "Show statistics of those who have filled forges",
+            required: false,
+            type: "BOOLEAN",
+        }) show_stats: boolean,
+        interaction: CommandInteraction): void {
+
+        
+        if (show_stats) {
+            const guild = interaction.guild?.id;
+            db.find({ "forges.guild": guild }).then(stats => {
+                if (stats.length) {
+                    // stats = [{ forges: {user: "name"}}]
+                    // count how many times a user appears in stats
+                    type Users = { [key: string]: number };
+                    let users: Users = {}
+                    stats.forEach(stat => {
+                        // @ts-ignore
+                        const user = stat.forges.user;
+                        const name = this.getUsername(user, interaction.guild);
+                        if (name) {
+                            if (users[name.displayName]) {
+                                users[name.displayName]++;
+                            } else {
+                                users[name.displayName] = 1;
+                            }
+                        }
+                    });
+    
+                    const formatted_message = Object.keys(users)
+                        .map(user => `${user}: ${users[user]}`)
+                        .join('\n');
+    
+                    interaction.reply({ content: formatted_message, ephemeral: true });
+                } else {
+                    interaction.reply("No stats found for this Discord server.")
+                }
+            }).catch(err => console.error(err));
+        } else {
+            interaction.reply({ content: "Thanks!", ephemeral: true });
+            const now = new Date();
+            const diff = 18480000; // 4 hours 8 minutes
+            const time = ((now.getTime() + diff - 3600000) / 1000).toFixed(0);
+            if (interaction.guild?.id) {
+                db.insert({
+                    forges: {
+                        guild: interaction.guild?.id,
+                        started: now,
+                        ended: time,
+                        user: interaction.member?.user.id
+                    }
+                });
+            }
+            interaction.channel?.send(`<@${interaction.member?.user.id}> has filled the forges!. I'll notify at <t:${time}:t> in <t:${time}:R> when it's time to go again.`);
+            setTimeout(() => {
+                interaction.channel?.send('@everyone It\'s roughly time to cycle the forges!');
+            }, diff);
+        }
     }
 }
 
@@ -558,7 +608,6 @@ export abstract class Group {
             `**${forcefield_duration(element, range).toLocaleString()}** hours inside of a forcefield`);
     }
 }
-
 @Discord()
 class Hlna {
     @Slash("hlna")

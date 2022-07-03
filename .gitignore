@@ -5,7 +5,9 @@ package-lock.json
 yarn.lock
 Lavalink/application.yml
 Lavalink/Lavalink.jar
+Lavalink/logs
 
 # folders
 build
 node_modules
+data.db
